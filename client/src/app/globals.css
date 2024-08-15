@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+textarea {
+    resize: none;
+}
+
+/* Estiliza o ícone do input date */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1); /* Inverte a cor do ícone */
+}

@@ -33,6 +33,7 @@ function Home() {
         deadline: Number(campaing.deadline),
         amountCollected: toEther(campaing.amountCollected).toString(),
         image: campaing.image,
+        description: campaing.description,
         pId: i + 1,
       }));
       localStorage.setItem("@campaings", JSON.stringify(parsedCampaings));

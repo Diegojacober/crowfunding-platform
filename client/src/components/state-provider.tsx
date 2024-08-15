@@ -1,6 +1,7 @@
 "use client";
 
 import { client } from "@/app/client";
+import { pid } from "process";
 import React, { createContext, useContext, useState } from "react";
 import {
   ContractOptions,
@@ -9,9 +10,10 @@ import {
   readContract,
   resolveMethod,
   sendTransaction,
+  toEther,
 } from "thirdweb";
 import { sepolia } from "thirdweb/chains";
-import { useConnect } from "thirdweb/react";
+import { useActiveAccount, useConnect } from "thirdweb/react";
 import { Account, createWallet, WalletId } from "thirdweb/wallets";
 
 type WalletOption = {
@@ -44,6 +46,9 @@ interface StateContextType {
   publishCampaing: (form: CampaignType, account: Account) => void;
   loading: boolean;
   contract: Readonly<ContractOptions<[]>>;
+  donate: Function;
+  getDonations: Function;
+  getTotalDonations: Function;
 }
 
 export type CampaignType = {
@@ -64,6 +69,9 @@ export const StateContext = createContext<StateContextType>({
     client: client,
     chain: sepolia,
   }),
+  getDonations: () => {},
+  donate: () => {},
+  getTotalDonations: () => {},
 });
 
 export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
@@ -74,6 +82,7 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
     client: client,
     chain: sepolia,
   });
+  const account = useActiveAccount();
 
   const publishCampaing = async (form: CampaignType, account: Account) => {
     const transaction = prepareContractCall({
@@ -106,6 +115,61 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  const donate = async (pId: number, amount: bigint) => {
+    const transaction = prepareContractCall({
+      contract,
+      method: resolveMethod("donateToCampaign"),
+      params: [pId],
+      value: amount,
+    });
+    await sendTransaction({
+      account: account!,
+      transaction,
+    })
+      .then((resp) => {
+        console.log(resp);
+        return resp;
+      })
+      .catch((e) => {
+        console.log("err: \n\n", e);
+      });
+  };
+
+  const getDonations = async (pId: number) => {
+    const donations = await readContract({
+      contract,
+      method: resolveMethod("getDonators"),
+      params: [pId],
+    });
+    const numberOfDonations = donations[0].length;
+    const parsedDonations = [];
+
+    for (let i = 0; i < numberOfDonations; i++) {
+      parsedDonations.push({
+        donator: donations[0][i],
+        donation: toEther(donations[1][i].toString()),
+      });
+    }
+
+    return parsedDonations;
+  };
+
+  const getTotalDonations = async (pId: number) => {
+    const donations = await readContract({
+      contract,
+      method: resolveMethod("getDonators"),
+      params: [pId],
+    });
+    const numberOfDonations = donations[0].length;
+    let totalDonations = BigInt(0);
+
+    for (let i = 0; i < numberOfDonations; i++) {
+      totalDonations += BigInt(donations[1][i].toString());
+    }
+
+    return totalDonations;
+  };
+
   const connectWithWallet = (walletId: WalletId) => {
     connect(async () => {
       const wallet = createWallet("io.metamask"); // pass the wallet id
@@ -123,7 +187,15 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <StateContext.Provider
-      value={{ connectWithWallet, publishCampaing, loading, contract }}
+      value={{
+        connectWithWallet,
+        publishCampaing,
+        loading,
+        contract,
+        getDonations,
+        donate,
+        getTotalDonations,
+      }}
     >
       {children}
     </StateContext.Provider>
